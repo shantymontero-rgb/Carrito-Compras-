@@ -1,0 +1,138 @@
+﻿{% extends 'store/base.html' %}
+{% block title %}Catálogo - CentralMarket{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4 pb-3 border-bottom" style="border-color: #e1f0e8 !important;">
+    <div class="col-md-7">
+        <span class="badge badge-cat mb-2">Temporada 2026</span>
+        <h2 class="fw-bold display-6 mb-1" style="color: #0b3d26;">Productos Seleccionados</h2>
+        <p class="text-muted mb-0">Revisa la disponibilidad en tiempo real y añade productos a tu carro.</p>
+    </div>
+    <div class="col-md-5 mt-3 mt-md-0 text-md-end">
+        <select id="categoryFilter" class="form-select border-0 shadow-sm d-inline-block w-auto py-2 px-3" style="border-radius: 12px;" onchange="loadProducts(this.value)">
+            <option value="">Todas las colecciones</option>
+            <option value="TEC">Tecnología & Gadgets</option>
+            <option value="ROPA">Prendas & Estilo</option>
+            <option value="HOG">Espacio & Hogar</option>
+            <option value="ACC">Accesorios Diarios</option>
+        </select>
+    </div>
+</div>
+
+<div class="row g-4" id="productsGrid">
+    <!-- Se llena dinámicamente con JS -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadProducts(category = '') {
+    let url = '/api/products/';
+    if (category) url += `?category=${category}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = '';
+            if (data.length === 0) {
+                grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No hay productos disponibles en esta categoría.</div>';
+                return;
+            }
+            data.forEach(p => {
+                const isOutOfStock = p.stock <= 0;
+                
+                // Indicador de disponibilidad
+                const stockBadge = isOutOfStock
+                    ? '<span class="badge bg-danger">Agotado</span>'
+                    : `<span class="badge ${p.stock <= 3 ? 'bg-warning text-dark' : 'bg-light text-success border'}">Quedan ${p.stock} unidades</span>`;
+
+                // Selector de cantidad y botón
+                const actionArea = isOutOfStock
+                    ? `<div class="alert alert-secondary text-center py-2 mb-0 small">Sin stock disponible</div>`
+                    : `
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <label for="qty-${p.id}" class="small text-muted mb-0">Cant:</label>
+                            <input type="number" id="qty-${p.id}" class="form-control form-control-sm text-center" value="1" min="1" max="${p.stock}" style="max-width: 80px;">
+                            <span class="small text-muted">(Máx. ${p.stock})</span>
+                        </div>
+                        <button class="btn btn-matcha w-100 py-2 shadow-sm" onclick="addToCart(${p.id}, ${p.stock})">
+                            <i class="bi bi-cart-plus me-1"></i> Agregar al Carro
+                        </button>
+                    `;
+
+                grid.innerHTML += `
+                    <div class="col-md-4 col-lg-3">
+                        <div class="card card-matcha h-100 p-3 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge badge-cat">${p.category_display}</span>
+                                    ${stockBadge}
+                                </div>
+                                <h5 class="fw-bold mt-2" style="color: #0b3d26;">${p.name}</h5>
+                                <p class="text-secondary small mb-3">${p.description || 'Producto disponible.'}</p>
+                            </div>
+                            <div class="pt-3 border-top" style="border-color: #f0f8f4 !important;">
+                                <div class="d-flex justify-content-between align-items-baseline mb-3">
+                                    <span class="small text-muted">Precio unitario:</span>
+                                    <span class="fs-5 fw-bold" style="color: #157347;">$${Number(p.price).toLocaleString('es-CL')}</span>
+                                </div>
+                                ${actionArea}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+}
+
+function addToCart(productId, maxStock) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        alert("Inicia sesión para agregar productos al carro.");
+        window.location.href = '/login/';
+        return;
+    }
+
+    const qtyInput = document.getElementById(`qty-${productId}`);
+    const quantity = parseInt(qtyInput.value, 10);
+
+    if (isNaN(quantity) || quantity <= 0) {
+        alert("Ingresa una cantidad válida.");
+        return;
+    }
+
+    if (quantity > maxStock) {
+        alert(`No puedes agregar más de ${maxStock} unidades (stock actual).`);
+        return;
+    }
+
+    fetch('/api/cart/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ product: productId, quantity: quantity })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (res.status === 401) {
+            localStorage.removeItem('access_token');
+            window.location.href = '/login/';
+            return;
+        }
+        if (!res.ok) {
+            throw new Error(data.error || "No fue posible agregar el producto.");
+        }
+        return data;
+    })
+    .then(data => {
+        if (data) alert("Producto agregado al carro.");
+    })
+    .catch(err => alert(err.message));
+}
+
+loadProducts();
+</script>
+{% endblock %}
