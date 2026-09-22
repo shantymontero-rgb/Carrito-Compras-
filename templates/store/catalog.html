@@ -20,7 +20,7 @@
 </div>
 
 <div class="row g-4" id="productsGrid">
-    <!-- Se llena dinámicamente con JS -->
+    <!-- Se llena con JS -->
 </div>
 {% endblock %}
 
@@ -36,18 +36,15 @@ function loadProducts(category = '') {
             const grid = document.getElementById('productsGrid');
             grid.innerHTML = '';
             if (data.length === 0) {
-                grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No hay productos disponibles en esta categoría.</div>';
+                grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No hay productos en esta categoría.</div>';
                 return;
             }
             data.forEach(p => {
                 const isOutOfStock = p.stock <= 0;
-                
-                // Indicador de disponibilidad
                 const stockBadge = isOutOfStock
                     ? '<span class="badge bg-danger">Agotado</span>'
                     : `<span class="badge ${p.stock <= 3 ? 'bg-warning text-dark' : 'bg-light text-success border'}">Quedan ${p.stock} unidades</span>`;
 
-                // Selector de cantidad y botón
                 const actionArea = isOutOfStock
                     ? `<div class="alert alert-secondary text-center py-2 mb-0 small">Sin stock disponible</div>`
                     : `
@@ -103,7 +100,7 @@ function addToCart(productId, maxStock) {
     }
 
     if (quantity > maxStock) {
-        alert(`No puedes agregar más de ${maxStock} unidades (stock actual).`);
+        alert(`No puedes agregar más de ${maxStock} unidades.`);
         return;
     }
 
@@ -122,13 +119,15 @@ function addToCart(productId, maxStock) {
             window.location.href = '/login/';
             return;
         }
-        if (!res.ok) {
-            throw new Error(data.error || "No fue posible agregar el producto.");
-        }
+        if (!res.ok) throw new Error(data.error || "No fue posible agregar.");
         return data;
     })
     .then(data => {
-        if (data) alert("Producto agregado al carro.");
+        if (data) {
+            // Actualizar badge y dar mensaje con cantidad
+            refreshCartBadge();
+            alert(`Producto añadido. Tienes ${data.total_items_count} producto(s) en total en tu carro.`);
+        }
     })
     .catch(err => alert(err.message));
 }

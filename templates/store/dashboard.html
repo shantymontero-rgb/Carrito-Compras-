@@ -1,0 +1,106 @@
+﻿{% extends 'store/base.html' %}
+{% block title %}Dashboard Administrador - CentralMarket{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+        <span class="badge bg-danger mb-1">Acceso Restringido</span>
+        <h2 class="fw-bold" style="color: #0b3d26;">Panel de Control Administrativo</h2>
+        <p class="text-muted mb-0">Métricas y supervisión del inventario y carritos.</p>
+    </div>
+    <a href="/" class="btn btn-outline-success rounded-pill px-3">
+        <i class="bi bi-arrow-left me-1"></i> Ir a la Tienda
+    </a>
+</div>
+
+<div class="row g-3 mb-4" id="statsCards">
+    <div class="col-md-3">
+        <div class="card card-matcha p-3 text-center">
+            <small class="text-muted text-uppercase fw-semibold">Total Productos</small>
+            <h3 class="fw-bold text-success mt-2 mb-0" id="statProducts">--</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-matcha p-3 text-center">
+            <small class="text-muted text-uppercase fw-semibold">Stock Crítico (&le; 3)</small>
+            <h3 class="fw-bold text-danger mt-2 mb-0" id="statCritical">--</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-matcha p-3 text-center">
+            <small class="text-muted text-uppercase fw-semibold">Valor Inventario</small>
+            <h3 class="fw-bold text-primary mt-2 mb-0" id="statInventoryValue">--</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-matcha p-3 text-center">
+            <small class="text-muted text-uppercase fw-semibold">Carros con Productos</small>
+            <h3 class="fw-bold text-warning mt-2 mb-0" id="statCarts">--</h3>
+        </div>
+    </div>
+</div>
+
+<div class="card card-matcha p-4">
+    <h5 class="fw-bold mb-3" style="color: #0b3d26;"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Productos con Stock Bajo o Agotados</h5>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr class="table-light">
+                    <th>ID</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock Restante</th>
+                </tr>
+            </thead>
+            <tbody id="criticalTableBody">
+                <!-- Se llena con JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const token = localStorage.getItem('access_token');
+if (!token) window.location.href = '/login/';
+
+fetch('/api/admin/dashboard/', {
+    headers: { 'Authorization': `Bearer ${token}` }
+})
+.then(res => {
+    if (res.status === 403 || res.status === 401) {
+        alert("Acceso denegado: este panel es exclusivo para administradores.");
+        window.location.href = '/';
+        return;
+    }
+    return res.json();
+})
+.then(data => {
+    if (!data) return;
+    document.getElementById('statProducts').textContent = data.total_products;
+    document.getElementById('statCritical').textContent = data.low_stock_count;
+    document.getElementById('statInventoryValue').textContent = '$' + Number(data.total_inventory_value).toLocaleString('es-CL');
+    document.getElementById('statCarts').textContent = data.total_cart_reservations;
+
+    const tbody = document.getElementById('criticalTableBody');
+    tbody.innerHTML = '';
+    if (!data.low_stock_items || data.low_stock_items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No hay productos en estado crítico. Todos tienen buen stock.</td></tr>';
+        return;
+    }
+    data.low_stock_items.forEach(p => {
+        tbody.innerHTML += `
+            <tr>
+                <td class="fw-bold">#${p.id}</td>
+                <td>${p.name}</td>
+                <td><span class="badge bg-light text-dark border">${p.category_display}</span></td>
+                <td>$${Number(p.price).toLocaleString('es-CL')}</td>
+                <td><span class="badge ${p.stock === 0 ? 'bg-danger' : 'bg-warning text-dark'}">${p.stock} unidades</span></td>
+            </tr>
+        `;
+    });
+});
+</script>
+{% endblock %}

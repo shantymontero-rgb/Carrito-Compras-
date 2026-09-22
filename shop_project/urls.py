@@ -22,15 +22,16 @@ from drf_yasg import openapi
 from rest_framework import permissions
 
 from store.views import (
-    catalog_view, cart_view, login_view,
-    ProductListAPI, CartListCreateAPI, CartItemDetailAPI
+    catalog_view, cart_view, login_view, dashboard_view,
+    ProductListAPI, CartListCreateAPI, CartItemDetailAPI,
+    AdminDashboardStatsAPI, CurrentUserAPI
 )
 
 schema_view = get_schema_view(
    openapi.Info(
       title="API Carrito de Compras",
       default_version='v1',
-      description="Documentación interactiva de la tienda",
+      description="Documentación interactiva de CentralMarket",
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
@@ -43,15 +44,18 @@ urlpatterns = [
     path('', catalog_view, name='home'),
     path('cart/', cart_view, name='cart_view'),
     path('login/', login_view, name='login_view'),
+    path('dashboard/', dashboard_view, name='dashboard_view'),
 
-    # Tokens JWT
+    # Tokens JWT y Usuario
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/me/', CurrentUserAPI.as_view(), name='api_me'),
 
     # Endpoints REST
     path('api/products/', ProductListAPI.as_view(), name='api_products'),
     path('api/cart/', CartListCreateAPI.as_view(), name='api_cart'),
     path('api/cart/<int:pk>/', CartItemDetailAPI.as_view(), name='api_cart_item'),
+    path('api/admin/dashboard/', AdminDashboardStatsAPI.as_view(), name='api_admin_dashboard'),
 
     # Documentación Swagger
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='swagger-ui'),
