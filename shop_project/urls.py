@@ -15,7 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.shortcuts import redirect
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -29,7 +30,7 @@ from store.views import (
 
 schema_view = get_schema_view(
    openapi.Info(
-      title="API Carrito de Compras",
+      title="API Carrito de Compras - CentralMarket",
       default_version='v1',
       description="Documentación interactiva de CentralMarket",
    ),
@@ -37,16 +38,20 @@ schema_view = get_schema_view(
    permission_classes=(permissions.AllowAny,),
 )
 
+# Función de redirección para atrapar cualquier 404
+def catch_all_redirect(request, *args, **kwargs):
+    return redirect('/')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # Vistas Web
+    # Vistas Web principales
     path('', catalog_view, name='home'),
     path('cart/', cart_view, name='cart_view'),
     path('login/', login_view, name='login_view'),
     path('dashboard/', dashboard_view, name='dashboard_view'),
 
-    # Tokens JWT y Usuario
+    # Tokens JWT y Sesión
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/me/', CurrentUserAPI.as_view(), name='api_me'),
@@ -59,4 +64,7 @@ urlpatterns = [
 
     # Documentación Swagger
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='swagger-ui'),
+
+    # RE_PATH CATCH-ALL (Elimina 404 redirigiendo al inicio)
+    re_path(r'^.*$', catch_all_redirect, name='catch_all'),
 ]

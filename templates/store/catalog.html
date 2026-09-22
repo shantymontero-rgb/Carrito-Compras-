@@ -30,7 +30,10 @@ function loadProducts(category = '') {
     let url = '/api/products/';
     if (category) url += `?category=${category}`;
 
-    fetch(url)
+    const token = localStorage.getItem('access_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch(url, { headers })
         .then(res => res.json())
         .then(data => {
             const grid = document.getElementById('productsGrid');
@@ -40,23 +43,43 @@ function loadProducts(category = '') {
                 return;
             }
             data.forEach(p => {
-                const isOutOfStock = p.stock <= 0;
-                const stockBadge = isOutOfStock
-                    ? '<span class="badge bg-danger">Agotado</span>'
-                    : `<span class="badge ${p.stock <= 3 ? 'bg-warning text-dark' : 'bg-light text-success border'}">Quedan ${p.stock} unidades</span>`;
+                const available = (p.available_stock !== undefined) ? p.available_stock : p.stock;
+                const inCart = p.in_cart || 0;
+                const isOutOfStock = available <= 0;
 
-                const actionArea = isOutOfStock
-                    ? `<div class="alert alert-secondary text-center py-2 mb-0 small">Sin stock disponible</div>`
-                    : `
+                let stockBadge = '';
+                let actionArea = '';
+
+                if (isOutOfStock) {
+                    stockBadge = '<span class="badge bg-danger">Sin stock disponible</span>';
+                    const notice = inCart > 0 
+                        ? `<small class="text-danger d-block mb-2 fw-semibold">Ya tienes las ${inCart} unidades en tu carro</small>` 
+                        : `<small class="text-muted d-block mb-2">Agotado temporalmente</small>`;
+                    
+                    actionArea = `
+                        <div class="alert alert-secondary text-center py-2 mb-0 small">
+                            ${notice}
+                            <button class="btn btn-secondary btn-sm w-100 py-2 rounded-pill" disabled>
+                                No disponible
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    stockBadge = `<span class="badge ${available <= 3 ? 'bg-warning text-dark' : 'bg-light text-success border'}">Quedan ${available} unidades</span>`;
+                    const inCartNotice = inCart > 0 ? `<small class="text-muted d-block mb-1">Tienes ${inCart} en carro</small>` : '';
+                    
+                    actionArea = `
+                        ${inCartNotice}
                         <div class="d-flex align-items-center gap-2 mb-3">
                             <label for="qty-${p.id}" class="small text-muted mb-0">Cant:</label>
-                            <input type="number" id="qty-${p.id}" class="form-control form-control-sm text-center" value="1" min="1" max="${p.stock}" style="max-width: 80px;">
-                            <span class="small text-muted">(Máx. ${p.stock})</span>
+                            <input type="number" id="qty-${p.id}" class="form-control form-control-sm text-center" value="1" min="1" max="${available}" style="max-width: 80px;">
+                            <span class="small text-muted">(Máx. ${available})</span>
                         </div>
-                        <button class="btn btn-matcha w-100 py-2 shadow-sm" onclick="addToCart(${p.id}, ${p.stock})">
+                        <button class="btn btn-matcha w-100 py-2 shadow-sm" onclick="addToCart(${p.id}, ${available})">
                             <i class="bi bi-cart-plus me-1"></i> Agregar al Carro
                         </button>
                     `;
+                }
 
                 grid.innerHTML += `
                     <div class="col-md-4 col-lg-3">
@@ -83,7 +106,7 @@ function loadProducts(category = '') {
         });
 }
 
-function addToCart(productId, maxStock) {
+function addToCart(productId, maxAvailable) {
     const token = localStorage.getItem('access_token');
     if (!token) {
         alert("Inicia sesión para agregar productos al carro.");
@@ -99,8 +122,8 @@ function addToCart(productId, maxStock) {
         return;
     }
 
-    if (quantity > maxStock) {
-        alert(`No puedes agregar más de ${maxStock} unidades.`);
+    if (quantity > maxAvailable) {
+        alert(`No puedes agregar más de ${maxAvailable} unidades disponibles.`);
         return;
     }
 
@@ -124,9 +147,9 @@ function addToCart(productId, maxStock) {
     })
     .then(data => {
         if (data) {
-            // Actualizar badge y dar mensaje con cantidad
             refreshCartBadge();
             alert(`Producto añadido. Tienes ${data.total_items_count} producto(s) en total en tu carro.`);
+            loadProducts(); // Recarga el catálogo al instante para actualizar el stock visible
         }
     })
     .catch(err => alert(err.message));
